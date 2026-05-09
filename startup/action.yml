@@ -1,0 +1,95 @@
+name: 'Start up Localstack'
+description: 'Starts up Localstack'
+
+inputs:
+  image-tag:
+    description: 'Tag of the LocalStack Docker image to use'
+    required: true
+    default: 'latest'
+  install-awslocal:
+    description: 'Whether to install the `awslocal` CLI into the environment'
+    required: true
+    default: 'true'
+  use-pro:
+    description: 'Deprecated. Whether to use LocalStack Pro (requires a valid CI Auth Token)'
+    required: false
+    default: 'true'
+    deprecationMessage: 'use-pro is deprecated and will be removed in a future release. The pro image is now the default.'
+  configuration:
+    description: 'Configuration variables to use for LocalStack'
+    required: false
+    default: ''
+  ci-project:
+    description: 'Name of the CI project to track in LocalStack Cloud'
+    required: false
+    default: ''
+  skip-wait:
+    description: 'Skip wait for LocalStack'
+    required: false
+    default: 'false'
+
+runs:
+  using: "composite"
+  steps:
+    # # NOTE: Thinking about this if we need it
+    # - name: Initial PR comment
+    #   # TODO: potentially replace with Action version number over time
+    #   uses: LocalStack/setup-localstack/prepare@main
+    #   if: inputs.ci-project && inputs.github-token
+    #   with:
+    #     github-token: ${{ inputs.github-token }}
+    #     ci-project: ${{ inputs.ci-project }}
+    - run: >
+        echo "GH_ACTION_ROOT=$(
+          ls -d $(
+            ls -d ./../../_actions/* |
+            grep -i localstack |
+            tail -n1
+          )/setup-localstack/* | 
+          grep -v completed | 
+          tail -n1
+        )" >> $GITHUB_ENV
+      shell: bash
+
+    - name: Install tools
+      uses: jenseng/dynamic-uses@5175289a9a87978dcfcb9cf512b821d23b2a53eb # v1
+      with:
+        uses: ${{ env.GH_ACTION_ROOT }}/tools
+        with: |-
+          {
+            "install-awslocal": ${{ toJSON(inputs.install-awslocal) }},
+          }
+
+    - name: Start LocalStack
+      run: |
+        if [ "$USE_PRO" = true ]; then
+          if [ "x$LOCALSTACK_API_KEY" != "x" ]; then
+            echo "WARNING: LOCALSTACK_API_KEY is deprecated, please use LOCALSTACK_AUTH_TOKEN instead."
+          fi
+          if [ "x$LOCALSTACK_AUTH_TOKEN" = "x" -a "x$LOCALSTACK_API_KEY" = "x" ]; then
+            echo "WARNING: LocalStack Auth Token not detected, please verify your configuration..."
+          fi
+          CONFIGURATION="DNS_ADDRESS=127.0.0.1 ${CONFIGURATION}"
+          IMAGE_NAME="${IMAGE_NAME:-localstack/localstack-pro:${IMAGE_TAG}}"
+        else
+          IMAGE_NAME="${IMAGE_NAME:-localstack/localstack:${IMAGE_TAG}}"
+        fi
+
+        CONFIGURATION="IMAGE_NAME=${IMAGE_NAME} ${CONFIGURATION}"
+        docker pull ${IMAGE_NAME} &
+        export CI_PROJECT="${CI_PROJECT_INPUT}"
+        eval "${CONFIGURATION} localstack start -d"
+
+        if [ "$SKIP_WAIT" = false ]; then
+          localstack wait -t ${LS_WAIT_TIMEOUT:-30}  # Let users configure the timeout via env variable
+        fi
+
+      shell: bash
+      env:
+        IMAGE_TAG: ${{ inputs.image-tag }}
+        INSTALL_AWSLOCAL: ${{ inputs.install-awslocal }}
+        USE_PRO: ${{ inputs.use-pro }}
+        CONFIGURATION: ${{ inputs.configuration }}
+        SKIP_WAIT: ${{ inputs.skip-wait }}
+        CI_PROJECT_INPUT: ${{ inputs.ci-project }}
+

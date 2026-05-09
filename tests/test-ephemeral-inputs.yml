@@ -1,0 +1,27 @@
+name: Test ephemeral instance inputs coverage
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Verify inputs are accepted (skip-startup path with ephemeral backend)
+        id: action
+        uses: .
+        with:
+          image-tag: latest
+          install-awslocal: 'true'
+          skip-startup: 'true'
+          state-backend: 'ephemeral'
+          preview-cmd: 'echo preview'
+          include-preview: 'false'
+          github-token: ''
+          skip-ephemeral-stop: 'true'
+      - name: Assert awslocal is installed
+        run: |
+          if ! command -v awslocal &>/dev/null; then
+            echo "FAIL: awslocal not found in PATH"
+            exit 1
+          fi
+          echo "PASS: awslocal is installed"
