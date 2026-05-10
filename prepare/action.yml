@@ -1,0 +1,33 @@
+name: Start CI Build
+
+inputs:
+  github-token:
+    description: 'Github token used to create PR comments'
+    required: true
+  ci-project:
+    description: 'Name of the CI project to track in LocalStack Cloud'
+    required: false
+
+runs:
+  using: composite
+  steps:
+    - name: Save PR number
+      shell: bash
+      env:
+        PR_NUMBER: ${{ github.event.number }}
+      run: echo "$PR_NUMBER" > ./pr-id.txt
+
+    - name: Upload PR number
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      with:
+        name: pr-id
+        path: ./pr-id.txt
+
+    - name: Create initial PR comment
+      uses: actions-cool/maintain-one-comment@b36a5b24a5293cc3bed7a8d4c0a74442cda865aa # v3.1.1
+      with:
+        token: ${{ inputs.github-token }}
+        body: |
+          ⚡️ Running CI build with LocalStack ...
+          <!-- Sticky Pull Request Comment -->
+        body-include: '<!-- Sticky Pull Request Comment -->'

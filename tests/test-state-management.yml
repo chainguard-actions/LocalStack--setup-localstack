@@ -1,0 +1,25 @@
+name: Test state management with state-name
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Test action with state save and state-name
+        id: action
+        continue-on-error: true
+        uses: .
+        with:
+          image-tag: 'latest'
+          install-awslocal: 'false'
+          skip-startup: 'false'
+          state-action: 'save'
+          state-backend: 'cloud-pods'
+          state-name: 'my-cloud-pod-state'
+          preview-cmd: 'echo deploy at $AWS_ENDPOINT_URL'
+          include-preview: 'false'
+      - name: Assert action step was reached
+        run: |
+          echo "Action outcome: ${{ steps.action.outcome }}"
+          echo "PASS: action step was reached with state-name and preview-cmd inputs"

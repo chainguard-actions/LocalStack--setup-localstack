@@ -1,0 +1,55 @@
+name: 'Save/Load LocalStack state'
+
+inputs:
+  name:
+    description: 'Name of the artifact'
+    required: true
+    default: 'ls-state'
+  action:
+    description: 'Action to perform (save or load)'
+    required: true
+    default: 'save'
+
+runs:
+  using: "composite"
+  steps:
+    # Try to get pr artifact from current workflow
+    - name: Download current workflow's Local State artifact
+      id: get-state-artifact
+      if: ${{ inputs.action == 'load' }}
+      uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+      continue-on-error: true
+      with:
+        name: ${{ inputs.name }}
+
+    # If the above fails, try to get the latest artifact from given workflow
+    - name: Download latest Local State artifact
+      uses: dawidd6/action-download-artifact@bf251b5aa9c2f7eeb574a96ee720e24f801b7c11 # v6
+      if: ${{ inputs.action == 'load' && steps.get-state-artifact.outcome == 'failure' }}
+      with:
+        name: ${{ inputs.name }}
+        workflow: ${{ env.LS_STATE_ARTIFACT_WORKFLOW }} # Can be ID or workflow file name, if empty falls back to the latest successful run of the current workflow
+        if_no_artifact_found: warn
+
+    - run: |
+        if [ "$ACTION" = "save" ]; then
+          echo "Saving State $NAME"
+          localstack state export ${NAME}.zip
+        elif [ "$ACTION" = "load" ]; then
+          echo "Loading State $NAME"
+          localstack state import ${NAME}.zip
+        else
+          echo "Invalid action: $ACTION"
+          exit 1
+        fi
+      shell: bash
+      env:
+        NAME: "${{ inputs.name }}"
+        ACTION: "${{ inputs.action }}"
+
+    - name: Upload LocalStack State
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      if: ${{ inputs.action == 'save' }}
+      with:
+        name: ${{ inputs.name }}
+        path: ./${{ inputs.name }}.zip

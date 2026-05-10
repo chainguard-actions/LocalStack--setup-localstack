@@ -1,0 +1,58 @@
+name: Shutdown Ephemeral Instance
+
+inputs:
+  localstack-api-key:
+    description: 'LocalStack API key used to access the platform api'
+    required: true
+  github-token:
+    description: 'Github token used to create PR comments'
+    required: true
+    
+
+runs:
+  using: composite
+  steps:
+    - name: Download PR artifact
+      uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+      with:
+        name: pr-id
+
+    - name: Load the PR ID
+      id: pr
+      shell: bash
+      run: echo "pr_id=$(<pr-id.txt)" >> $GITHUB_OUTPUT
+
+    - name: Setup preview name
+      shell: bash
+      run: |
+        prId=$(<pr-id.txt)
+        repoName=$GITHUB_REPOSITORY
+        repoNameCleaned=$(echo -n "$repoName" | tr -c '[:alnum:]' '-')
+        previewName=preview-$repoNameCleaned-$prId
+        echo "previewName=$previewName" >> $GITHUB_ENV
+
+    - name: Shutdown ephemeral instance
+      shell: bash
+      env:
+        LOCALSTACK_API_KEY_INPUT: ${{ inputs.localstack-api-key }}
+      run: |
+        response=$(curl -X DELETE \
+            -s -o /dev/null -w "%{http_code}" \
+            -H "ls-api-key: ${LOCALSTACK_AUTH_TOKEN:-${LOCALSTACK_API_KEY:-$LOCALSTACK_API_KEY_INPUT}}" \
+            -H "content-type: application/json" \
+            https://api.localstack.cloud/v1/compute/instances/$previewName)
+        if [[ "$response" -ne 200 ]]; then
+          # In case the deletion fails, e.g. if the instance cannot be found, we raise a proper error on the platform
+          echo "Unable to delete preview environment. API response: $response"
+          exit 1
+        fi
+    
+    - name: Update status comment
+      uses: actions-cool/maintain-one-comment@b36a5b24a5293cc3bed7a8d4c0a74442cda865aa # v3.1.1
+      with:
+        token: ${{ inputs.github-token }}
+        body: |
+          The ephemeral instance for the application preview has been shut down
+          <!-- Sticky Pull Request Comment -->
+        body-include: '<!-- Sticky Pull Request Comment -->'
+        number: ${{ steps.pr.outputs.pr_id }}
