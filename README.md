@@ -8,6 +8,7 @@ Hardened by [Chainguard](https://www.chainguard.dev) from the upstream action at
 
 | Version | Tag | Upstream commit |
 |---------|-----|-----------------|
+| v0.2.4 | [`v0.2.4`](https://github.com/chainguard-actions/setup-localstack/tree/v0.2.4) | — |
 | v0.3.0 | [`v0.3.0`](https://github.com/chainguard-actions/setup-localstack/tree/v0.3.0) | — |
 
 ## Privacy
