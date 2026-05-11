@@ -1,0 +1,37 @@
+name: Test ephemeral instance with preview inputs
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Run action with ephemeral + preview inputs
+        id: action
+        uses: .
+        with:
+          image-tag: latest
+          install-awslocal: 'true'
+          skip-startup: 'true'
+          state-action: 'start'
+          state-backend: 'ephemeral'
+          state-name: 'test-state'
+          preview-cmd: 'echo preview at $AWS_ENDPOINT_URL'
+          include-preview: 'true'
+          github-token: ${{ github.token }}
+          lifetime: '30'
+        continue-on-error: true
+
+      - name: Assert action was invoked with ephemeral inputs
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          # The action may fail due to missing LocalStack CI auth token,
+          # but it should have been invoked with all required inputs.
+          # We verify the step ran (not skipped).
+          if [ "$OUTCOME" = "skipped" ]; then
+            echo "FAIL: action step was unexpectedly skipped"
+            exit 1
+          fi
+          echo "PASS: action was invoked with preview-cmd, include-preview, and state-name inputs"

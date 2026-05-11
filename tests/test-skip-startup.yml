@@ -1,0 +1,27 @@
+name: Test skip-startup mode
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Run action with skip-startup
+        id: action
+        uses: .
+        with:
+          image-tag: latest
+          install-awslocal: 'true'
+          skip-startup: 'true'
+        continue-on-error: true
+
+      - name: Assert action completed (skip-startup path)
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          if [ "$OUTCOME" = "failure" ]; then
+            echo "FAIL: action failed unexpectedly in skip-startup mode"
+            exit 1
+          fi
+          echo "PASS: action completed in skip-startup mode"

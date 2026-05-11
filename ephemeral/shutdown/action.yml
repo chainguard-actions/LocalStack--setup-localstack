@@ -1,0 +1,82 @@
+name: Shutdown Ephemeral Instance
+description: 'Shutdowns an Ephemeral Instance (PR Preview)'
+
+inputs:
+  localstack-api-key:
+    description: 'LocalStack Auth Token used to access the platform api'
+    required: false
+  github-token:
+    description: 'Github token used to create PR comments'
+    required: true
+    
+
+runs:
+  using: composite
+  steps:
+    - name: Download PR artifact
+      uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+      with:
+        name: pr-id
+
+    - name: Load the PR ID
+      id: pr
+      shell: bash
+      run: echo "pr_id=$(<pr-id.txt)" >> $GITHUB_OUTPUT
+
+    - name: Setup preview name
+      shell: bash
+      run: |
+        prId=$(<pr-id.txt)
+        repoName=$GITHUB_REPOSITORY
+        repoNameCleaned=$(echo -n "$repoName" | tr -c '[:alnum:]' '-')
+        previewName=preview-$repoNameCleaned-$prId
+        echo "previewName=$previewName" >> $GITHUB_ENV
+
+    - name: Shutdown ephemeral instance
+      shell: bash
+      env:
+        LOCALSTACK_API_KEY_INPUT: ${{ inputs.localstack-api-key }}
+        ACTION_PATH: ${{ github.action_path }}
+      run: |
+        AUTH_HEADER="ls-api-key: ${LOCALSTACK_AUTH_TOKEN:-${LOCALSTACK_API_KEY:-$LOCALSTACK_API_KEY_INPUT}}"
+        CONTENT_TYPE_HEADER="content-type: application/json"
+        API_URL_BASE="https://api.localstack.cloud/v1/compute/instances"
+
+        source "$ACTION_PATH/../retry-function.sh"
+        shutdown_instance() {
+            # The API returns a 200 on successful deletion.
+            # We use --fail-with-body so curl fails on server errors (5xx) and triggers the retry.
+            local response
+            response=$(curl --fail-with-body -s -w "\n%{http_code}" -X DELETE \
+                -H "$AUTH_HEADER" \
+                -H "$CONTENT_TYPE_HEADER" \
+                "$API_URL_BASE/$previewName")
+            local exit_code=$?
+            local http_code=$(echo "$response" | tail -n1)
+            local body=$(echo "$response" | sed '$d')
+
+            if [ $exit_code -ne 0 ]; then
+              # A 404 means it's already gone, which is a success case for shutdown.
+              if [ "$http_code" -ne 404 ]; then
+                echo "Error deleting instance, curl failed with exit code $exit_code. API response: $body" >&2
+                return 1
+              fi
+            fi
+            if [ "$http_code" -eq 200 ]; then
+                echo "Instance '$previewName' deleted successfully."
+            elif [ "$http_code" -eq 404 ]; then
+                echo "Instance '$previewName' was already deleted (not found)."
+            fi
+        }
+
+        retry shutdown_instance
+    
+    - name: Update status comment
+      uses: actions-cool/maintain-one-comment@4b2dbf086015f892dcb5e8c1106f5fccd6c1476b # v3
+      with:
+        token: ${{ inputs.github-token }}
+        body: |
+          The ephemeral instance for the application preview has been shut down
+          <!-- Sticky Pull Request Comment -->
+        body-include: '<!-- Sticky Pull Request Comment -->'
+        number: ${{ steps.pr.outputs.pr_id }}

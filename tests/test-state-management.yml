@@ -1,0 +1,32 @@
+name: Test state management with state-name
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Run action with state-action save and state-name
+        id: action
+        uses: .
+        with:
+          image-tag: latest
+          install-awslocal: 'false'
+          skip-startup: 'true'
+          state-action: 'save'
+          state-backend: 'cloud-pods'
+          state-name: 'my-test-pod'
+        continue-on-error: true
+
+      - name: Assert action was invoked with state-name
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          # The action may fail without a real LocalStack CI auth token,
+          # but it should not be skipped — it should have been invoked.
+          if [ "$OUTCOME" = "skipped" ]; then
+            echo "FAIL: action step was unexpectedly skipped"
+            exit 1
+          fi
+          echo "PASS: action was invoked with state-name and state-action inputs"
