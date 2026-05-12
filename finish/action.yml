@@ -1,0 +1,87 @@
+name: Finish CI Build
+description: Finish CI Build
+
+inputs:
+  github-token:
+    description: 'Github token used to create PR comments'
+    required: true
+  ci-project:
+    description: 'Name of the CI project tracked in LocalStack Cloud'
+    required: false
+  include-preview:
+    description: 'Whether to include the created Ephemeral Instance URL in the PR comment'
+    required: false
+  preview-url:
+    description: 'The Ephmeral Instance URL to include in the PR comment'
+    required: false
+
+runs:
+  using: composite
+  steps:
+    # Try to get pr artifact from current workflow
+    - name: Download current PR artifact
+      id: get-pr-artifact
+      uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+      continue-on-error: true
+      with:
+        name: pr-id
+
+    # If the above fails, try to get the latest pr artifact from the PR related workflows
+    - name: Download latest PR artifact
+      uses: dawidd6/action-download-artifact@0bd50d53a6d7fb5cb921e607957e9cc12b4ce392 # v12
+      if: ${{ steps.get-pr-artifact.outcome == 'failure' }}
+      with:
+        name: pr-id
+        pr: ${{ github.event.pull_request.number }}
+        # Can be ID or workflow file name, if empty falls back to the latest successful run of the current workflow
+        workflow: ${{ env.PR_ARTIFACT_WORKFLOW }}
+
+    - name: Load the PR ID
+      id: pr
+      shell: bash
+      run: echo "pr_id=$(<pr-id.txt)" >> $GITHUB_OUTPUT
+
+    - name: Download preview instance URL
+      id: get-preview-instance-url-artifact
+      if: inputs.include-preview
+      uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+      with:
+        name: preview-instance-url
+
+    # If the above fails, try to get the latest pr artifact from the PR related workflows
+    - name: Download latest PR artifact
+      uses: dawidd6/action-download-artifact@0bd50d53a6d7fb5cb921e607957e9cc12b4ce392 # v12
+      if: ${{ steps.get-preview-instance-url-artifact.outcome == 'failure' }}
+      with:
+        name: preview-instance-url
+        pr: ${{ github.event.pull_request.number }}
+        # Can be ID or workflow file name, if empty falls back to the latest successful run of the current workflow
+        workflow: ${{ env.PR_ARTIFACT_WORKFLOW }}
+
+    - name: Load the Ephemeral Instance URL
+      shell: bash
+      if: inputs.include-preview
+      env:
+        INPUT_PREVIEW_URL: ${{ inputs.preview-url }}
+      run: |
+        resolved_url="${LS_PREVIEW_URL:-${INPUT_PREVIEW_URL}}"
+        if [[ -n "$resolved_url" ]]; then
+          safe_url=$(printf '%s' "$resolved_url" | tr -d '\n\r')
+          echo "LS_PREVIEW_URL=${safe_url}" >> "$GITHUB_ENV"
+        elif [[ -e ls-preview-url.txt ]]; then
+          safe_url=$(printf '%s' "$(<ls-preview-url.txt)" | tr -d '\n\r')
+          echo "LS_PREVIEW_URL=${safe_url}" >> "$GITHUB_ENV"
+        else
+          echo "LS_PREVIEW_URL=Unable to determine preview URL" >> "$GITHUB_ENV"
+        fi
+
+    - name: Update status comment
+      uses: actions-cool/maintain-one-comment@4b2dbf086015f892dcb5e8c1106f5fccd6c1476b # v3
+      with:
+        token: ${{ inputs.github-token }}
+        body: |
+          ${{ inputs.ci-project && format('{0}{1}', '🚀 LocalStack Stack Insights and Cloud Pod state for this CI run: https://app.localstack.cloud/ci/', inputs.ci-project) }}
+          ${{ inputs.include-preview && format('{0}{1}', '🚀 Preview for this PR: ', env.LS_PREVIEW_URL) }}
+          <!-- Sticky Pull Request Comment -->
+        body-include: '<!-- Sticky Pull Request Comment -->'
+        number: ${{ steps.pr.outputs.pr_id }}

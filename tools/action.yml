@@ -1,0 +1,23 @@
+name: 'Install Localstack tools'
+description: 'Installs `localstack` and optionally `awslocal` CLI'
+
+inputs:
+  install-awslocal:
+    description: 'Whether to install the `awslocal` CLI into the environment'
+    required: true
+    default: 'true'
+
+runs:
+  using: "composite"
+  steps:
+    - name: Start LocalStack
+      run: |
+        pip install --upgrade pip
+        which localstack > /dev/null || pip install localstack
+        if [ "$INSTALL_AWSLOCAL" = true ]; then
+          which awslocal > /dev/null || pip install awscli-local[ver1]
+        fi
+      shell: bash
+      env:
+        INSTALL_AWSLOCAL: "${{ inputs.install-awslocal }}"
+

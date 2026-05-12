@@ -1,0 +1,25 @@
+name: Test state management inputs
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Setup LocalStack with state-name input
+        id: action
+        uses: .
+        with:
+          image-tag: 'latest'
+          install-awslocal: 'true'
+          skip-startup: 'true'
+          state-action: 'save'
+          state-backend: 'local'
+          state-name: 'my-localstack-state'
+      - name: Assert awslocal is installed
+        run: |
+          if ! command -v awslocal &>/dev/null; then
+            echo "FAIL: awslocal CLI was not installed"
+            exit 1
+          fi
+          echo "PASS: awslocal is available"
