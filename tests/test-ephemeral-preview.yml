@@ -1,0 +1,25 @@
+name: Test ephemeral instance with preview inputs
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - id: action
+        uses: .
+        with:
+          image-tag: latest
+          install-awslocal: 'true'
+          skip-startup: 'true'
+          state-backend: 'ephemeral'
+          preview-cmd: 'echo "preview at $AWS_ENDPOINT_URL"'
+          include-preview: 'false'
+          skip-ephemeral-stop: 'true'
+      - name: Assert awslocal is installed
+        run: |
+          if ! command -v awslocal &>/dev/null; then
+            echo "FAIL: awslocal not found in PATH"
+            exit 1
+          fi
+          echo "PASS: awslocal is installed (ephemeral/preview inputs accepted)"
