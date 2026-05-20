@@ -1,7 +1,0 @@
-{
-  "owner": "LocalStack",
-  "name": "setup-localstack",
-  "visibility": "public",
-  "description": "Sets up LocalStack CLI in your GitHub Actions workflow.",
-  "block_publish": false
-}
