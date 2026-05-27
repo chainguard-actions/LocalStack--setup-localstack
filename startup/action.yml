@@ -76,7 +76,7 @@ runs:
 
         CONFIGURATION="IMAGE_NAME=${IMAGE_NAME} ${CONFIGURATION}"
         docker pull ${IMAGE_NAME} &
-        export CI_PROJECT="$CI_PROJECT_INPUT"
+        export CI_PROJECT="${CI_PROJECT_INPUT}"
         eval "${CONFIGURATION} localstack start -d"
 
         if [ "$SKIP_WAIT" = false ]; then

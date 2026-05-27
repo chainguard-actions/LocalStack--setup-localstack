@@ -1,4 +1,4 @@
-name: Test LocalStack setup with skip-startup
+name: Test LocalStack setup with ephemeral backend and save action
 on:
   workflow_dispatch:
 jobs:
@@ -7,22 +7,22 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - name: Setup LocalStack with skip-startup
+      - name: Setup LocalStack with ephemeral backend (save)
         id: action
         uses: .
         with:
           image-tag: 'latest'
           install-awslocal: 'true'
-          skip-startup: 'true'
+          skip-startup: 'false'
           skip-wait: 'false'
           configuration: ''
           ci-project: ''
           github-token: ''
-          preview-cmd: 'echo preview'
-          include-preview: 'false'
-          state-name: 'test-state'
-          state-action: ''
-          state-backend: 'cloud-pods'
+          preview-cmd: 'echo "preview $AWS_ENDPOINT_URL"'
+          include-preview: 'true'
+          state-name: 'my-ephemeral-state'
+          state-action: 'save'
+          state-backend: 'ephemeral'
           auto-load-pod: ''
           extension-auto-install: ''
           lifetime: '30'
